@@ -24,7 +24,10 @@ export default function Cadastro() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password: senha,
-      options: { data: { nome, telefone, registro } },
+      options: {
+        data: { nome, telefone, registro },
+        emailRedirectTo: window.location.origin + window.location.pathname,
+      },
     })
     setEnviando(false)
     if (error) return setErro(mensagemErro(error.message))
