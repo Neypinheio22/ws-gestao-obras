@@ -6,6 +6,10 @@ import Cadastro from './pages/Cadastro'
 import Aguardando from './pages/Aguardando'
 import Inicio from './pages/Inicio'
 import Admin from './pages/Admin'
+import NovaVistoria from './pages/NovaVistoria'
+import VistoriaPage from './pages/VistoriaPage'
+import AmbientePage from './pages/AmbientePage'
+import ConclusaoPage from './pages/ConclusaoPage'
 
 function Carregando() {
   return <div className="centro">Carregando…</div>
@@ -37,6 +41,10 @@ export default function App() {
       <Route path="/aguardando" element={<Aguardando />} />
       <Route path="/admin" element={<Protegida soAdmin><Admin /></Protegida>} />
       <Route path="/" element={<Protegida><Inicio /></Protegida>} />
+      <Route path="/nova" element={<Protegida><NovaVistoria /></Protegida>} />
+      <Route path="/vistoria/:id" element={<Protegida><VistoriaPage /></Protegida>} />
+      <Route path="/vistoria/:id/ambiente/:ambId" element={<Protegida><AmbientePage /></Protegida>} />
+      <Route path="/vistoria/:id/conclusao" element={<Protegida><ConclusaoPage /></Protegida>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

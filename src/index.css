@@ -124,3 +124,92 @@ button.pequeno { padding: 8px 12px; font-size: 0.85rem; }
 .selo-pendente { background: #fef3c7; color: var(--alerta) !important; }
 .selo-aprovado { background: #dcfce7; color: var(--ok) !important; }
 .selo-bloqueado { background: #fee2e2; color: var(--perigo) !important; }
+
+/* ---------- vistorias ---------- */
+select, textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  font-size: 16px;
+  background: #fff;
+  width: 100%;
+}
+textarea { resize: vertical; }
+input { width: 100%; }
+fieldset { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+legend { font-weight: 700; margin-bottom: 4px; color: var(--primaria); }
+
+.pilha { display: flex; flex-direction: column; gap: 10px; }
+.grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 380px) { .grade-2 { grid-template-columns: 1fr; } }
+.topo-acoes { display: flex; flex-direction: row !important; gap: 8px; }
+.botao.pequeno, a.botao.pequeno { padding: 8px 12px; font-size: 0.85rem; }
+.botao.secundario { background: transparent; color: var(--texto); border: 1px solid var(--borda); }
+.grande, .botao.grande { width: 100%; padding: 16px; font-size: 1.05rem; display: block; }
+.destaque { border: 2px solid var(--primaria); }
+.destaque strong { color: var(--primaria); }
+.destaque-ok { border: 2px solid var(--ok); }
+.pequeno-texto { font-size: 0.85rem; margin: 0; }
+.titulo-secao { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.titulo-secao h2 { margin: 0; }
+
+.linha-vistoria {
+  background: var(--cartao);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+.linha-vistoria > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.linha-vistoria span { color: var(--sutil); font-size: 0.85rem; }
+.selo-neutro { background: #e5e7eb; color: var(--sutil) !important; }
+.linha-vistoria .selo { flex-shrink: 0; align-self: center; margin: 0; }
+
+.segmentos { display: flex; gap: 6px; flex-wrap: wrap; }
+.segmentos button {
+  flex: 1;
+  min-width: 56px;
+  background: #fff;
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  padding: 10px 6px;
+  font-size: 0.9rem;
+}
+.segmentos button:hover { background: #f9fafb; }
+.segmentos button.ativo { background: var(--ok); border-color: var(--ok); color: #fff; }
+.segmentos button.seg-problema.ativo { background: var(--perigo); border-color: var(--perigo); }
+
+.item {
+  background: var(--cartao);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+  border-left: 4px solid transparent;
+}
+.item-problema { border-left-color: var(--perigo); }
+.item-topo { display: flex; justify-content: space-between; gap: 8px; }
+.item-desc { font-size: 0.85rem; font-weight: 600; }
+button.icone { background: none; color: var(--sutil); padding: 0 6px; font-size: 1.2rem; }
+button.link { background: none; color: var(--primaria); padding: 0; text-align: left; font-weight: 500; font-size: 0.85rem; }
+button.link-perigo { background: none; color: var(--perigo); padding: 8px 0; font-weight: 500; font-size: 0.85rem; }
+button.icone:hover, button.link:hover, button.link-perigo:hover { background: none; text-decoration: underline; }
+.linha-form { display: flex; gap: 8px; }
+.linha-form input { flex: 1; }
+
+.grade-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.foto { margin: 0; background: var(--cartao); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 3px rgb(0 0 0 / 0.06); }
+.foto img, .foto-vazia { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #e5e7eb; }
+.foto input, .foto select { padding: 8px; font-size: 14px; }
+
+.aviso-amarelo { background: #fef3c7; color: #92400e; padding: 12px; border-radius: 10px; margin: 0; }
+.lista-simples { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
