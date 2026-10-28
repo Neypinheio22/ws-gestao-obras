@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { mensagemErro } from '../lib/erros'
 
 export default function Entrar() {
   const [email, setEmail] = useState('')
@@ -14,7 +15,7 @@ export default function Entrar() {
     setEnviando(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
     setEnviando(false)
-    if (error) setErro(error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message)
+    if (error) setErro(mensagemErro(error.message))
   }
 
   return (

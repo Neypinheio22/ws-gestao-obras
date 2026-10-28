@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { mensagemErro } from '../lib/erros'
 
 export default function Cadastro() {
   const navigate = useNavigate()
@@ -26,7 +27,7 @@ export default function Cadastro() {
       options: { data: { nome, telefone, registro } },
     })
     setEnviando(false)
-    if (error) return setErro(error.message)
+    if (error) return setErro(mensagemErro(error.message))
     // Sem sessão = o Supabase pediu confirmação de e-mail antes do primeiro acesso.
     navigate(data.session ? '/aguardando' : '/aguardando?confirmar=1', { replace: true })
   }
