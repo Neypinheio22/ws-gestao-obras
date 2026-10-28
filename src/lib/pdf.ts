@@ -29,6 +29,7 @@ const ALTURA = 297
 const UTIL = LARGURA - 2 * MARGEM
 const COR = [194, 65, 12] as const // laranja da marca
 const ALIAS_TOTAL = '{total_paginas}'
+const TOPO = 35 // início do conteúdo, abaixo do papel timbrado
 
 interface Opcoes {
   dados: VistoriaCompleta
@@ -76,13 +77,13 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const objetivo = objetivoDaVistoria(v)
   const resp = identificacaoTecnica(vistoriador)
-  let y = MARGEM + 4
+  let y = TOPO
 
   // ---------- utilitários de layout ----------
   function novaPaginaSePreciso(altura: number) {
     if (y + altura > ALTURA - 18) {
       doc.addPage()
-      y = MARGEM + 4
+      y = TOPO
     }
   }
 
@@ -413,26 +414,55 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
   linhasAss.push(`${cidade}${cidade ? ', ' : ''}${dataPorExtenso(new Date().toLocaleDateString('sv-SE'))}`)
   linhasAss.filter(Boolean).forEach((l, k) => doc.text(l, LARGURA / 2, y + 9.5 + k * 4.5, { align: 'center' }))
 
-  // ---------- rodapé em todas as páginas ----------
+  // ---------- papel timbrado: cabeçalho e rodapé em todas as páginas ----------
+  const logo = vistoriador?.logo ? await carregarImagem(vistoriador.logo) : null
+  const marca = vistoriador?.cabecalho?.trim() || ''
+  const contatos = [vistoriador?.telefone, vistoriador?.email_contato, vistoriador?.contato_extra].map((x) => x?.trim()).filter(Boolean) as string[]
   const total = doc.getNumberOfPages()
   for (let p = 1; p <= total; p++) {
     doc.setPage(p)
+    let x0 = MARGEM
+    if (logo) {
+      const esc = Math.min(32 / logo.w, 20 / logo.h)
+      const w = logo.w * esc
+      const h = logo.h * esc
+      doc.addImage(logo.data, MARGEM, 7 + (20 - h) / 2, w, h, 'logo', 'FAST')
+      x0 = MARGEM + w + 4
+      // marca d'água discreta no centro da página
+      const gs = doc as unknown as { GState: new (o: { opacity: number }) => unknown; setGState: (g: unknown) => void }
+      gs.setGState(new gs.GState({ opacity: 0.05 }))
+      const escM = Math.min(110 / logo.w, 110 / logo.h)
+      doc.addImage(logo.data, (LARGURA - logo.w * escM) / 2, (ALTURA - logo.h * escM) / 2, logo.w * escM, logo.h * escM, 'logo', 'FAST')
+      gs.setGState(new gs.GState({ opacity: 1 }))
+    }
+    doc.setTextColor(COR[0], COR[1], COR[2])
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12.5)
+    doc.text((marca || resp.nome).toUpperCase(), x0, 13)
+    doc.setTextColor(40, 40, 40)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', marca ? 'normal' : 'bold')
+    doc.text(marca ? [resp.nome, resp.titulo].filter(Boolean).join(' – ') : resp.titulo, x0, 18)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.text([resp.registro, resp.conselho].filter(Boolean).join('  ·  '), x0, 22.5)
     doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.8)
+    doc.setTextColor(90, 90, 90)
+    contatos.forEach((c, k) => doc.text(c, LARGURA - MARGEM, 13 + k * 4.5, { align: 'right' }))
+    doc.setDrawColor(COR[0], COR[1], COR[2])
+    doc.setLineWidth(0.7)
+    doc.line(MARGEM, 28.5, LARGURA - MARGEM, 28.5)
+    doc.setDrawColor(200, 200, 200)
+    doc.setLineWidth(0.2)
+    doc.line(MARGEM, ALTURA - 12, LARGURA - MARGEM, ALTURA - 12)
     doc.setFontSize(7.5)
     doc.setTextColor(120, 120, 120)
-    // Cabeçalho: nome/marca e registro técnico do responsável
-    const topo = (vistoriador?.cabecalho?.trim() || 'WS GESTÃO DE OBRAS').toUpperCase()
-    doc.setFont('helvetica', 'bold')
-    doc.text(topo, MARGEM, 9)
-    doc.setFont('helvetica', 'normal')
-    doc.text([resp.nome, resp.registro].filter(Boolean).join('  ·  '), LARGURA - MARGEM, 9, { align: 'right' })
-    doc.setDrawColor(COR[0], COR[1], COR[2])
-    doc.setLineWidth(0.4)
-    doc.line(MARGEM, 11, LARGURA - MARGEM, 11)
-    doc.setLineWidth(0.2)
     doc.text(`${v.cliente_nome} · ${formatarData(v.data_vistoria)}`, MARGEM, ALTURA - 8)
+    if (marca) doc.text(marca, LARGURA / 2, ALTURA - 8, { align: 'center' })
     doc.text(`Página ${p} de ${ALIAS_TOTAL}`, LARGURA - MARGEM, ALTURA - 8, { align: 'right' })
     doc.setTextColor(0, 0, 0)
+    doc.setDrawColor(0)
   }
   doc.putTotalPages(ALIAS_TOTAL)
 

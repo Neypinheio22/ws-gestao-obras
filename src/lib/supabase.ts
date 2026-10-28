@@ -19,6 +19,9 @@ export interface Profile {
   conselho: string | null
   cidade_base: string | null
   cabecalho: string | null
+  logo: string | null
+  email_contato: string | null
+  contato_extra: string | null
   role: Role
   status: Status
   created_at: string

@@ -47,6 +47,7 @@ const MOVEIS = 'MÓVEIS E EQUIPAMENTOS'
 const GUARDA_CORPO = 'GUARDA CORPO (FIXAÇÃO E ACABAMENTO)'
 
 export const TIPOS_AMBIENTE: { nome: string; itens: string[] }[] = [
+  { nome: 'Entrada / Hall de entrada', itens: [...BASE_RECEBIMENTO, 'PORTA DE ENTRADA', 'INTERFONE E CAMPAINHA'] },
   { nome: 'Sala', itens: [...BASE_RECEBIMENTO, MOVEIS, 'QUADRO DG'] },
   { nome: 'Cozinha', itens: [...BASE_RECEBIMENTO, LOUCAS, TORNEIRAS, MOVEIS] },
   { nome: 'Banheiro / Lavabo', itens: [...BASE_RECEBIMENTO, LOUCAS, TORNEIRAS, CHUVEIRO, MOVEIS] },
@@ -57,6 +58,7 @@ export const TIPOS_AMBIENTE: { nome: string; itens: string[] }[] = [
   { nome: 'Área de serviço', itens: [...BASE_RECEBIMENTO, TORNEIRAS, GUARDA_CORPO] },
   { nome: 'Hall / Circulação', itens: [...BASE_RECEBIMENTO] },
   { nome: 'Fachada / Área externa', itens: ['FACHADA (REVESTIMENTO E PINTURA)', 'ESTRUTURA (FISSURAS, RACHADURAS, DESPLACAMENTO)', 'PORTÃO E ACESSOS', 'CALÇADA E PISO EXTERNO'] },
+  { nome: 'Garagem', itens: ['PISOS E REVESTIMENTOS (REJUNTE, IRREGULARIDADES E NÍVEL)', 'PAREDES E RODAPÉ (PINTURA E EMASSAMENTO)', 'TOMADAS, INTERRUPTORES E LÂMPADAS', 'PORTÃO E ACESSOS'] },
   { nome: 'Outro', itens: [...BASE_RECEBIMENTO] },
 ]
 

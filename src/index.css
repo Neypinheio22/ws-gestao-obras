@@ -232,3 +232,11 @@ label.check { display: flex; flex-direction: row; align-items: center; gap: 10px
 .novo-bib { border-top: 1px solid var(--borda, #e5e7eb); padding-top: 10px; }
 .constatacao { display: flex; flex-direction: column; gap: 4px; }
 .constatacao-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.linha-ordenavel { display: flex; align-items: stretch; gap: 6px; }
+.linha-ordenavel > .linha-vistoria { flex: 1; min-width: 0; }
+.setas { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.setas .icone:disabled { opacity: 0.25; }
+.logo-campo { display: flex; align-items: center; gap: 14px; }
+.logo-campo img, .logo-vazia { width: 96px; height: 96px; object-fit: contain; border: 1px solid var(--borda); border-radius: 10px; background: #fff; }
+.logo-vazia { display: flex; align-items: center; justify-content: center; color: var(--sutil); font-size: 0.8rem; }
+label.botao { cursor: pointer; text-align: center; }

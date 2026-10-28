@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth'
 import { mensagemErro } from '../lib/erros'
 import { supabase, type Profile } from '../lib/supabase'
 
-type Campos = Pick<Profile, 'nome' | 'titulo_profissional' | 'registro' | 'conselho' | 'telefone' | 'cidade_base' | 'cabecalho'>
+type Campos = Pick<Profile, 'nome' | 'titulo_profissional' | 'registro' | 'conselho' | 'telefone' | 'cidade_base' | 'cabecalho' | 'email_contato' | 'contato_extra' | 'logo'>
 
 const TITULOS = ['Técnico em Edificações', 'Engenheiro Civil', 'Arquiteto e Urbanista', 'Técnico em Segurança do Trabalho']
 
@@ -19,6 +19,9 @@ export default function MeuPerfil() {
     telefone: profile?.telefone ?? '',
     cidade_base: profile?.cidade_base ?? '',
     cabecalho: profile?.cabecalho ?? '',
+    email_contato: profile?.email_contato ?? profile?.email ?? '',
+    contato_extra: profile?.contato_extra ?? '',
+    logo: profile?.logo ?? '',
   })
   const [msg, setMsg] = useState('')
   const [erro, setErro] = useState('')
@@ -31,6 +34,25 @@ export default function MeuPerfil() {
         <input value={c[nome] ?? ''} onChange={(e) => setC((s) => ({ ...s, [nome]: e.target.value }))} {...extra} />
       </label>
     )
+  }
+
+  // Reduz a logo para no máximo 600 px e guarda como imagem PNG no próprio perfil.
+  async function escolherLogo(arq: File | undefined) {
+    if (!arq) return
+    try {
+      const bmp = await createImageBitmap(arq)
+      const escala = Math.min(1, 600 / Math.max(bmp.width, bmp.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(bmp.width * escala)
+      canvas.height = Math.round(bmp.height * escala)
+      canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+      bmp.close()
+      let url = canvas.toDataURL('image/png')
+      if (url.length > 390000) url = canvas.toDataURL('image/jpeg', 0.85)
+      setC((s) => ({ ...s, logo: url }))
+    } catch {
+      setErro('Não foi possível ler essa imagem. Tente um arquivo PNG ou JPG.')
+    }
   }
 
   async function salvar(e: FormEvent) {
@@ -70,7 +92,24 @@ export default function MeuPerfil() {
           {campo('telefone', 'Telefone', { type: 'tel' })}
           {campo('cidade_base', 'Cidade onde assina', { placeholder: 'Ex.: Eusébio-CE' })}
         </div>
-        {campo('cabecalho', 'Nome no topo das páginas do laudo', { placeholder: 'Ex.: WS Gestão de Obras – Vistorias e Laudos' })}
+        <fieldset>
+          <legend>Papel timbrado do laudo</legend>
+          <div className="logo-campo">
+            {c.logo ? <img src={c.logo} alt="Logo" /> : <div className="logo-vazia">Sem logo</div>}
+            <div className="pilha">
+              <label className="botao secundario pequeno">
+                {c.logo ? 'Trocar logo' : 'Enviar logo'}
+                <input type="file" accept="image/*" hidden onChange={(e) => escolherLogo(e.target.files?.[0])} />
+              </label>
+              {c.logo && <button type="button" className="link-perigo" onClick={() => setC((s) => ({ ...s, logo: '' }))}>Tirar logo</button>}
+            </div>
+          </div>
+          {campo('cabecalho', 'Nome da empresa / marca', { placeholder: 'Ex.: WS Gestão de Obras' })}
+          <div className="grade-2">
+            {campo('email_contato', 'E-mail no laudo', { type: 'email' })}
+            {campo('contato_extra', 'Site, Instagram ou endereço', { placeholder: 'Ex.: @wsgestaodeobras' })}
+          </div>
+        </fieldset>
 
         <div className="previa-assinatura">
           <span className="sutil pequeno-texto">Como sai na assinatura do laudo:</span>

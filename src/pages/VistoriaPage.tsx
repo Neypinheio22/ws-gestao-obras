@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import CamposDados from '../components/CamposDados'
 import { ETAPAS_ANDAMENTO, TIPOS_AMBIENTE } from '../lib/modelos'
 import { formatarData, useVistoria } from '../lib/useVistoria'
-import { adicionarAmbiente, apagarVistoria, salvarVistoria, type Vistoria } from '../lib/vistorias'
+import { adicionarAmbiente, apagarVistoria, salvarAmbiente, salvarVistoria, type Vistoria } from '../lib/vistorias'
 import { limparCampos } from './NovaVistoria'
 
 export default function VistoriaPage() {
@@ -54,6 +54,21 @@ export default function VistoriaPage() {
     }
   }
 
+  // Ordem em que ele percorre o imóvel (entrada, fachada, cozinha...). É a mesma ordem do laudo.
+  async function mover(i: number, delta: number) {
+    const j = i + delta
+    if (j < 0 || j >= ambientes.length) return
+    const lista = [...ambientes]
+    ;[lista[i], lista[j]] = [lista[j], lista[i]]
+    const nova = lista.map((a, k) => ({ ...a, ordem: k }))
+    setDados((d) => (d ? { ...d, ambientes: nova } : d))
+    try {
+      await Promise.all(nova.filter((a, k) => ambientes[k]?.id !== a.id).map((a) => salvarAmbiente(a.id, { ordem: a.ordem })))
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }
+
   async function excluir() {
     if (!window.confirm(`Apagar a vistoria de ${v.cliente_nome}? Fotos e anotações serão perdidas.`)) return
     try {
@@ -90,13 +105,17 @@ export default function VistoriaPage() {
           <p className="sutil">Adicione {obra ? 'as etapas que vai vistoriar' : 'os ambientes que vai vistoriar'} e escolha os itens de cada um.</p>
         )}
         <ul className="lista">
-          {ambientes.map((a) => {
+          {ambientes.map((a, idx) => {
             const its = itens.filter((i) => i.ambiente_id === a.id)
             const feitos = its.filter((i) => i.situacao).length
             const nFotos = fotos.filter((f) => f.ambiente_id === a.id).length
             const completo = its.length > 0 && feitos === its.length
             return (
-              <li key={a.id}>
+              <li key={a.id} className="linha-ordenavel">
+                <span className="setas">
+                  <button type="button" className="icone" title="Subir" disabled={idx === 0} onClick={() => mover(idx, -1)}>↑</button>
+                  <button type="button" className="icone" title="Descer" disabled={idx === ambientes.length - 1} onClick={() => mover(idx, 1)}>↓</button>
+                </span>
                 <Link className="linha-vistoria" to={`/vistoria/${v.id}/ambiente/${a.id}`}>
                   <div>
                     <strong>{a.nome}</strong>
