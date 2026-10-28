@@ -15,6 +15,10 @@ export interface Profile {
   nome: string
   telefone: string | null
   registro: string | null
+  titulo_profissional: string | null
+  conselho: string | null
+  cidade_base: string | null
+  cabecalho: string | null
   role: Role
   status: Status
   created_at: string

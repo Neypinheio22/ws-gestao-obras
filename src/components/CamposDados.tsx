@@ -1,4 +1,4 @@
-import type { TipoVistoria } from '../lib/modelos'
+import { OBJETIVOS, objetivosDoTipo, type TipoVistoria } from '../lib/modelos'
 import type { Vistoria } from '../lib/vistorias'
 
 type Valores = Partial<Vistoria>
@@ -7,7 +7,7 @@ interface Props {
   tipo: TipoVistoria
   valores: Valores
   onChange: (campo: keyof Vistoria, valor: string) => void
-  onBlur?: (campo: keyof Vistoria) => void
+  onBlur?: (campo: keyof Vistoria, valor?: string) => void
 }
 
 // Campos de dados do cliente e do imóvel, usados na criação e na edição da vistoria.
@@ -29,13 +29,13 @@ export default function CamposDados({ tipo, valores, onChange, onBlur }: Props) 
     )
   }
 
-  function area(nome: keyof Vistoria, rotulo: string, placeholder: string) {
+  function area(nome: keyof Vistoria, rotulo: string, placeholder: string, linhas = 3) {
     const valor = valores[nome]
     return (
       <label>
         {rotulo}
         <textarea
-          rows={3}
+          rows={linhas}
           placeholder={placeholder}
           value={valor == null ? '' : String(valor)}
           onChange={(e) => onChange(nome, e.target.value)}
@@ -45,8 +45,29 @@ export default function CamposDados({ tipo, valores, onChange, onBlur }: Props) 
     )
   }
 
+  function escolherObjetivo(valor: string) {
+    // Traz o texto padrão do objetivo para ele editar à vontade.
+    const texto = OBJETIVOS.find((o) => o.valor === valor)?.texto ?? ''
+    onChange('objetivo_tipo', valor)
+    onChange('objetivo_texto', texto)
+    onBlur?.('objetivo_tipo', valor)
+    onBlur?.('objetivo_texto', texto)
+  }
+
   return (
     <>
+      <fieldset>
+        <legend>Objetivo da vistoria</legend>
+        <label>
+          Finalidade *
+          <select required value={valores.objetivo_tipo ?? ''} onChange={(e) => escolherObjetivo(e.target.value)}>
+            <option value="" disabled>Escolha o objetivo</option>
+            {objetivosDoTipo(tipo).map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
+          </select>
+        </label>
+        {valores.objetivo_tipo && area('objetivo_texto', 'Texto do objetivo no laudo (pode editar)', 'Escreva o objetivo desta vistoria', 6)}
+      </fieldset>
+
       <fieldset>
         <legend>Cliente</legend>
         {campo('cliente_nome', obra ? 'Contratante *' : 'Nome completo *', { required: true })}

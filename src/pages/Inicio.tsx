@@ -38,12 +38,19 @@ export default function Inicio() {
           <small>Olá, {profile?.nome || profile?.email}</small>
         </div>
         <div className="topo-acoes">
+          <Link className="botao secundario pequeno" to="/perfil">Meu perfil</Link>
           {profile?.role === 'admin' && (
             <Link className="botao secundario pequeno" to="/admin">Usuários</Link>
           )}
           <button type="button" className="secundario pequeno" onClick={sair}>Sair</button>
         </div>
       </header>
+
+      {profile && (!profile.registro || !profile.titulo_profissional) && (
+        <Link className="aviso-amarelo" to="/perfil">
+          Complete seu perfil técnico (título e registro) para que saiam em todos os laudos →
+        </Link>
+      )}
 
       <div className="grade-2">
         <Link className="cartao link-cartao destaque" to="/nova?tipo=recebimento">

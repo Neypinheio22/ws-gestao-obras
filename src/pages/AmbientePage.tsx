@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { SITUACOES, situacaoEhProblema, sugerirNC } from '../lib/modelos'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import SeletorBiblioteca from '../components/SeletorBiblioteca'
+import { gruposDeItens, sistemaDoItem } from '../lib/biblioteca'
+import { ETAPAS_ANDAMENTO, SITUACOES, TIPOS_AMBIENTE, itensParaNovoAmbiente, situacaoEhProblema, sugerirNC } from '../lib/modelos'
 import { supabase } from '../lib/supabase'
 import { useVistoria } from '../lib/useVistoria'
 import {
+  adicionarItens,
   apagarAmbiente,
   apagarFoto,
   enviarFoto,
@@ -27,7 +30,8 @@ export default function AmbientePage() {
   const { dados, setDados, erro, setErro, recarregar } = useVistoria(id)
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [enviando, setEnviando] = useState(0)
-  const [novoItem, setNovoItem] = useState('')
+  const [params] = useSearchParams()
+  const [escolhendo, setEscolhendo] = useState<boolean | null>(null)
   const [abertos, setAbertos] = useState<Record<string, boolean>>({})
   const inputFoto = useRef<HTMLInputElement>(null)
 
@@ -55,6 +59,24 @@ export default function AmbientePage() {
   const indice = dados.ambientes.findIndex((a) => a.id === amb.id)
   const proximo = dados.ambientes[indice + 1]
 
+  const mostrarSeletor = escolhendo ?? (params.has('escolher') || itens.length === 0)
+  // Tipo do ambiente para sugerir os itens do modelo dele (escolhido ao criar, ou pelo nome).
+  const tipoAmbiente =
+    params.get('escolher') ||
+    (v.tipo === 'andamento'
+      ? ETAPAS_ANDAMENTO.find((e) => e.nome === amb.nome)?.nome
+      : TIPOS_AMBIENTE.find((t) => amb.nome.toLowerCase().startsWith(t.nome.split(' ')[0].toLowerCase()))?.nome) ||
+    ''
+  const sugeridos = tipoAmbiente
+    ? itensParaNovoAmbiente(v.tipo, tipoAmbiente).map((t) => ({ texto: t, sistema: sistemaDoItem(v.tipo, t) }))
+    : []
+
+  async function incluirItens(escolhas: { texto: string; sistema: string | null }[]) {
+    await adicionarItens(amb!, escolhas.map((e) => ({ descricao: e.texto, sistema: e.sistema ?? sistemaDoItem(v.tipo, e.texto) })), itens.length)
+    setEscolhendo(false)
+    await recarregar()
+  }
+
   function atualizarItemLocal(itemId: string, campos: Partial<Item>) {
     setDados((d) => (d ? { ...d, itens: d.itens.map((i) => (i.id === itemId ? { ...i, ...campos } : i)) } : d))
   }
@@ -62,11 +84,6 @@ export default function AmbientePage() {
   async function marcar(item: Item, situacao: string) {
     const nova = item.situacao === situacao ? null : situacao
     const campos: Partial<Item> = { situacao: nova }
-    // Ao marcar como problema, já sugere o "por quê" e a solução com base na descrição.
-    if (nova && situacaoEhProblema(v.tipo, nova) && !item.impacto && !item.solucao) {
-      const s = sugerirNC(`${item.observacao ?? ''} ${item.descricao}`)
-      if (s) Object.assign(campos, { impacto: s.impacto, solucao: s.solucao })
-    }
     atualizarItemLocal(item.id, campos)
     try {
       await salvarItem(item.id, campos)
@@ -81,17 +98,6 @@ export default function AmbientePage() {
     } catch (e) {
       setErro((e as Error).message)
     }
-  }
-
-  async function adicionarItem() {
-    const descricao = novoItem.trim().toUpperCase()
-    if (!descricao) return
-    const { error } = await supabase
-      .from('itens')
-      .insert({ vistoria_id: v.id, ambiente_id: amb!.id, descricao, ordem: itens.length })
-    if (error) return setErro(error.message)
-    setNovoItem('')
-    recarregar()
   }
 
   async function removerItem(item: Item) {
@@ -230,6 +236,19 @@ export default function AmbientePage() {
         </div>
       </section>
 
+      {mostrarSeletor && (
+        <SeletorBiblioteca
+          titulo={`O que você vai verificar em ${amb.nome}?`}
+          tipo="item"
+          grupos={gruposDeItens(v.tipo)}
+          sugeridos={sugeridos.length ? { titulo: `Do seu modelo: ${tipoAmbiente}`, textos: sugeridos } : undefined}
+          jaUsados={itens.map((i) => i.descricao)}
+          maiusculas
+          onConfirmar={incluirItens}
+          onFechar={() => setEscolhendo(false)}
+        />
+      )}
+
       <section className="pilha">
         <div className="titulo-secao">
           <h2>Checklist</h2>
@@ -239,6 +258,7 @@ export default function AmbientePage() {
             </button>
           )}
         </div>
+        {itens.length === 0 && <p className="sutil">Nenhum item escolhido ainda.</p>}
         <ul className="lista">
           {itens.map((item) => {
             const problema = situacaoEhProblema(v.tipo, item.situacao)
@@ -281,6 +301,20 @@ export default function AmbientePage() {
                     </button>
                     {aberto && (
                       <>
+                        {!item.impacto && !item.solucao && sugerirNC(`${item.observacao ?? ''} ${item.descricao}`) && (
+                          <button
+                            type="button"
+                            className="link"
+                            onClick={() => {
+                              const sug = sugerirNC(`${item.observacao ?? ''} ${item.descricao}`)!
+                              const campos = { impacto: sug.impacto, solucao: sug.solucao }
+                              atualizarItemLocal(item.id, campos)
+                              salvarItem(item.id, campos).catch((e) => setErro(e.message))
+                            }}
+                          >
+                            Usar texto sugerido
+                          </button>
+                        )}
                         <textarea
                           rows={2}
                           placeholder="Por que é um problema?"
@@ -290,7 +324,7 @@ export default function AmbientePage() {
                         />
                         <textarea
                           rows={2}
-                          placeholder="O que a construtora deve fazer?"
+                          placeholder="O que deve ser feito?"
                           value={item.solucao ?? ''}
                           onChange={(e) => atualizarItemLocal(item.id, { solucao: e.target.value })}
                           onBlur={() => salvarTexto(item, 'solucao')}
@@ -303,10 +337,9 @@ export default function AmbientePage() {
             )
           })}
         </ul>
-        <div className="linha-form">
-          <input placeholder="Novo item do checklist" value={novoItem} onChange={(e) => setNovoItem(e.target.value)} />
-          <button type="button" onClick={adicionarItem} disabled={!novoItem.trim()}>Adicionar</button>
-        </div>
+        {!mostrarSeletor && (
+          <button type="button" className="secundario" onClick={() => setEscolhendo(true)}>+ Escolher itens da biblioteca</button>
+        )}
       </section>
 
       {proximo ? (

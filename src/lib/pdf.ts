@@ -6,14 +6,16 @@ import {
   LIMITANTES,
   METODOLOGIA,
   NORMAS,
-  OBJETIVO,
   PRESSUPOSTOS,
   RESSALVAS,
   SISTEMAS_RECEBIMENTO,
   SITUACOES,
   TITULO,
+  objetivoDaVistoria,
+  paragrafosObjetivo,
   situacaoEhProblema,
 } from './modelos'
+import { montarSintese, recomendacaoFinal } from './sintese'
 import { urlsDasFotos, type Foto, type Item, type VistoriaCompleta } from './vistorias'
 import { formatarData } from './useVistoria'
 
@@ -34,12 +36,13 @@ interface Opcoes {
   aoProgresso?: (texto: string) => void
 }
 
-export function tituloProfissional(registro: string | null) {
-  const r = (registro ?? '').toUpperCase()
-  if (r.includes('CFT')) return 'Técnico em Edificações'
-  if (r.includes('CAU')) return 'Arquiteto(a)'
-  if (r.includes('CREA')) return 'Engenheiro(a)'
-  return 'Vistoriador(a)'
+// Linhas de identificação do responsável técnico, iguais no cabeçalho, no encerramento e na assinatura.
+export function identificacaoTecnica(p: Profile | null) {
+  const nome = p?.nome?.trim() || 'Responsável técnico'
+  const titulo = p?.titulo_profissional?.trim() || ''
+  const registro = p?.registro?.trim() ? `REGISTRO TÉCNICO: ${p.registro.trim()}` : ''
+  const conselho = p?.conselho?.trim() || ''
+  return { nome, titulo, registro, conselho }
 }
 
 function dataPorExtenso(iso: string) {
@@ -71,7 +74,9 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
   const { vistoria: v, ambientes, itens, fotos } = dados
   const obra = v.tipo === 'andamento'
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  let y = MARGEM
+  const objetivo = objetivoDaVistoria(v)
+  const resp = identificacaoTecnica(vistoriador)
+  let y = MARGEM + 4
 
   // ---------- utilitários de layout ----------
   function novaPaginaSePreciso(altura: number) {
@@ -150,6 +155,7 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
         ['CONSTRUTORA / EXECUTOR', v.construtora ?? '-'],
         ['RESP. TÉCNICO DA OBRA', v.responsavel_obra ?? '-'],
         ['ÁREA PREVISTA', v.area_m2 ? `${String(v.area_m2).replace('.', ',')} m²` : '-'],
+        ['FINALIDADE', objetivo.rotulo],
       ]
     : [
         ['NOME COMPLETO', v.cliente_nome],
@@ -158,7 +164,10 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
         ['ÁREA CONSTRUÍDA', v.area_m2 ? `${String(v.area_m2).replace('.', ',')} m²` : '-'],
         ['TIPO', v.unidade ?? '-'],
         ...(v.construtora ? ([['CONSTRUTORA', v.construtora]] as [string, string][]) : []),
+        ['FINALIDADE', objetivo.rotulo],
       ]
+  cab.push(['RESPONSÁVEL PELA VISTORIA', [resp.nome, resp.titulo].filter(Boolean).join(' – ')])
+  if (resp.registro) cab.push(['REGISTRO TÉCNICO', [vistoriador!.registro!.trim(), resp.conselho].filter(Boolean).join('  ·  ')])
   autoTable(doc, {
     startY: y,
     body: cab,
@@ -171,7 +180,7 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
 
   // ---------- 1. objetivo ----------
   titulo('1. OBJETIVO')
-  OBJETIVO[v.tipo].forEach((p) => paragrafo(p))
+  paragrafosObjetivo(v).forEach((p) => paragrafo(p))
   subtitulo('1.1 RELAÇÃO DE NORMAS TÉCNICAS UTILIZADAS')
   NORMAS[v.tipo].forEach((n) => marcador(n))
 
@@ -296,7 +305,7 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
   if (problemas.length) {
     autoTable(doc, {
       startY: y,
-      head: [['O QUE FOI ENCONTRADO?', 'POR QUE É UM PROBLEMA?', obra ? 'O QUE DEVE SER FEITO?' : 'O QUE A CONSTRUTORA DEVE FAZER?']],
+      head: [['O QUE FOI ENCONTRADO?', 'POR QUE É UM PROBLEMA?', objetivo.valor === 'recebimento_novo' ? 'O QUE A CONSTRUTORA DEVE FAZER?' : 'O QUE DEVE SER FEITO?']],
       body: problemas.map((p) => [
         `${p.ambiente}: ${p.observacao?.trim() || p.descricao}`,
         p.impacto ?? '',
@@ -325,43 +334,84 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
   if (v.laudo_resumo) paragrafo(v.laudo_resumo)
   const unicos = Array.from(new Set(problemas.map((p) => (p.observacao?.trim() || p.descricao).toLowerCase())))
   unicos.forEach((p) => marcador(p.charAt(0).toUpperCase() + p.slice(1)))
-  paragrafo(
-    obra
-      ? 'Recomendamos que as correções sejam feitas antes que os serviços sejam cobertos pelas etapas seguintes. Esta vistoria seguiu as diretrizes da ABNT NBR 16747 e as normas de execução listadas no item 1.1.'
-      : 'Recomendamos que o construtor realize os devidos ajustes e correções necessários para manter a qualidade, segurança e conforto do imóvel para os moradores. Esta vistoria seguiu as normas e diretrizes listadas no item 1.1, em especial a ABNT NBR 15575, que estabelece requisitos de desempenho da edificação.',
-  )
+  paragrafo(recomendacaoFinal(dados))
 
-  // ---------- conclusão ----------
+  // ---------- conclusão: só o que o vistoriador escolheu ----------
   titulo(`${secao++}. CONCLUSÕES`)
-  if (v.conclusao) paragrafo(v.conclusao)
+  let sub = 1
+  const nSecao = secao - 1
+  if (v.incluir_resumo) {
+    const sintese = montarSintese(dados)
+    subtitulo(`${nSecao}.${sub++} Síntese da inspeção`)
+    sintese.paragrafos.forEach((p) => paragrafo(p))
+    if (sintese.grupos.length) {
+      novaPaginaSePreciso(14 + sintese.grupos.length * 9)
+      autoTable(doc, {
+        rowPageBreak: 'avoid',
+        startY: y,
+        head: [['SISTEMA', 'OCORRÊNCIAS', 'NORMA DE REFERÊNCIA', 'PRIORIDADE']],
+        body: sintese.grupos.map((g) => [g.sistema, `${g.ocorrencias.length} – ${Array.from(new Set(g.ocorrencias.map((o) => o.ambiente))).join(', ')}`, g.normas, g.prioridade]),
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 1.6 },
+        headStyles: { fillColor: [55, 65, 81], fontSize: 8 },
+        columnStyles: { 0: { cellWidth: 42, fontStyle: 'bold' }, 2: { cellWidth: 46 }, 3: { cellWidth: 22, halign: 'center' } },
+        margin: { left: MARGEM, right: MARGEM },
+      })
+      y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4
+    }
+  }
+  const constatacoes = (v.conclusoes_tecnicas ?? []).filter((c) => c.texto.trim())
+  if (constatacoes.length) {
+    subtitulo(`${nSecao}.${sub++} Constatações técnicas`)
+    constatacoes.forEach((c, i) => {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      const linhas = doc.splitTextToSize(c.texto.trim(), UTIL - 7) as string[]
+      linhas.forEach((l, k) => {
+        novaPaginaSePreciso(5)
+        if (k === 0) {
+          doc.setFont('helvetica', 'bold')
+          doc.text(`${i + 1}.`, MARGEM + 1, y)
+          doc.setFont('helvetica', 'normal')
+        }
+        doc.text(l, MARGEM + 7, y)
+        y += 4.2
+      })
+      y += 1.5
+    })
+    y += 1
+  }
+  if (v.conclusao?.trim()) {
+    if (sub > 1) subtitulo(`${nSecao}.${sub++} Parecer`)
+    paragrafo(v.conclusao.trim())
+  }
   if (v.grau_risco) {
     const g = GRAU_RISCO[v.grau_risco]
+    novaPaginaSePreciso(16)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
-    novaPaginaSePreciso(8)
     doc.text(`GRAU DE RISCO GLOBAL: ${g.rotulo}`, MARGEM, y)
-    y += 6
+    y += 5
+    paragrafo(`Classificação conforme a ABNT NBR 16747: ${g.texto}.`)
   }
   if (obra && v.proxima_vistoria) paragrafo(`Recomenda-se nova vistoria: ${v.proxima_vistoria}.`)
 
   // ---------- encerramento ----------
   novaPaginaSePreciso(65) // mantém o texto de encerramento junto da assinatura
   titulo(`${secao++}. ENCERRAMENTO`)
-  const nome = vistoriador?.nome || 'o(a) responsável técnico(a)'
-  const registro = vistoriador?.registro ? `, ${vistoriador.registro}` : ''
-  paragrafo(
-    `Este ${obra ? 'relatório de vistoria técnica de obra em andamento' : 'laudo técnico de vistoria de recebimento de imóvel'} é composto por ${ALIAS_TOTAL} páginas e foi elaborado por ${nome}, ${tituloProfissional(vistoriador?.registro ?? null)}${registro}.`,
-  )
+  const quem = [resp.nome, resp.titulo, resp.registro, resp.conselho].filter(Boolean).join(', ')
+  paragrafo(`Este ${objetivo.documento} é composto por ${ALIAS_TOTAL} páginas e foi elaborado por ${quem}.`)
   y += 18
   doc.setDrawColor(0)
   doc.line(LARGURA / 2 - 45, y, LARGURA / 2 + 45, y)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(9)
-  doc.text(nome.toUpperCase(), LARGURA / 2, y + 5, { align: 'center' })
+  doc.text(resp.nome.toUpperCase(), LARGURA / 2, y + 5, { align: 'center' })
   doc.setFont('helvetica', 'normal')
-  doc.text(`${tituloProfissional(vistoriador?.registro ?? null)}${registro}`, LARGURA / 2, y + 9.5, { align: 'center' })
-  doc.text('Responsável pela elaboração do relatório', LARGURA / 2, y + 14, { align: 'center' })
-  doc.text(`${v.local_emissao || v.cidade || ''}${v.local_emissao || v.cidade ? ', ' : ''}${dataPorExtenso(new Date().toLocaleDateString('sv-SE'))}`, LARGURA / 2, y + 18.5, { align: 'center' })
+  const linhasAss = [resp.titulo, [resp.registro, resp.conselho].filter(Boolean).join(' · '), 'Responsável pela elaboração do relatório']
+  const cidade = v.local_emissao || vistoriador?.cidade_base || v.cidade || ''
+  linhasAss.push(`${cidade}${cidade ? ', ' : ''}${dataPorExtenso(new Date().toLocaleDateString('sv-SE'))}`)
+  linhasAss.filter(Boolean).forEach((l, k) => doc.text(l, LARGURA / 2, y + 9.5 + k * 4.5, { align: 'center' }))
 
   // ---------- rodapé em todas as páginas ----------
   const total = doc.getNumberOfPages()
@@ -370,6 +420,16 @@ export async function gerarLaudoPdf({ dados, vistoriador, aoProgresso }: Opcoes)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(7.5)
     doc.setTextColor(120, 120, 120)
+    // Cabeçalho: nome/marca e registro técnico do responsável
+    const topo = (vistoriador?.cabecalho?.trim() || 'WS GESTÃO DE OBRAS').toUpperCase()
+    doc.setFont('helvetica', 'bold')
+    doc.text(topo, MARGEM, 9)
+    doc.setFont('helvetica', 'normal')
+    doc.text([resp.nome, resp.registro].filter(Boolean).join('  ·  '), LARGURA - MARGEM, 9, { align: 'right' })
+    doc.setDrawColor(COR[0], COR[1], COR[2])
+    doc.setLineWidth(0.4)
+    doc.line(MARGEM, 11, LARGURA - MARGEM, 11)
+    doc.setLineWidth(0.2)
     doc.text(`${v.cliente_nome} · ${formatarData(v.data_vistoria)}`, MARGEM, ALTURA - 8)
     doc.text(`Página ${p} de ${ALIAS_TOTAL}`, LARGURA - MARGEM, ALTURA - 8, { align: 'right' })
     doc.setTextColor(0, 0, 0)

@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import SeletorBiblioteca, { type Escolha } from '../components/SeletorBiblioteca'
+import { CONCLUSOES, sistemaDoItem } from '../lib/biblioteca'
 import { GRAU_RISCO, situacaoEhProblema } from '../lib/modelos'
 import { gerarLaudoPdf, nomeArquivoLaudo } from '../lib/pdf'
+import { montarSintese, sugerirConclusao, type Grau } from '../lib/sintese'
 import { supabase, type Profile } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import { useVistoria } from '../lib/useVistoria'
-import { salvarVistoria, type Vistoria } from '../lib/vistorias'
+import { salvarVistoria, type Constatacao, type Vistoria } from '../lib/vistorias'
 import { limparCampos } from './NovaVistoria'
 
 export default function ConclusaoPage() {
@@ -12,6 +16,8 @@ export default function ConclusaoPage() {
   const { dados, setDados, erro, setErro } = useVistoria(id)
   const [progresso, setProgresso] = useState('')
   const [pdf, setPdf] = useState<{ url: string; blob: Blob; nome: string } | null>(null)
+  const [escolhendo, setEscolhendo] = useState(false)
+  const { profile } = useAuth()
 
   if (erro) return <main className="pagina"><Link to={`/vistoria/${id}`}>← Voltar</Link><p className="erro">{erro}</p></main>
   if (!dados) return <div className="centro">Carregando…</div>
@@ -35,22 +41,53 @@ export default function ConclusaoPage() {
     }
   }
 
-  function sugerirTextos() {
+  const sintese = montarSintese(dados)
+  const constatacoes: Constatacao[] = v.conclusoes_tecnicas ?? []
+  // Sistemas com não conformidade: as constatações desses sistemas aparecem primeiro na biblioteca.
+  const sistemasComNC = Array.from(new Set(problemas.map((p) => p.sistema ?? sistemaDoItem(v.tipo, p.descricao)).filter(Boolean))) as string[]
+
+  async function gravarConstatacoes(lista: Constatacao[]) {
+    setDados((d) => (d ? { ...d, vistoria: { ...d.vistoria, conclusoes_tecnicas: lista } } : d))
+    try {
+      await salvarVistoria(v.id, { conclusoes_tecnicas: lista })
+    } catch (e) {
+      setErro((e as Error).message)
+    }
+  }
+
+  async function incluirConstatacoes(escolhas: Escolha[]) {
+    await gravarConstatacoes([...constatacoes, ...escolhas.map((e) => ({ sistema: e.sistema ?? 'Meus itens', texto: e.texto }))])
+    setEscolhendo(false)
+  }
+
+  function editarConstatacao(i: number, texto: string) {
+    setDados((d) => {
+      if (!d) return d
+      const lista = d.vistoria.conclusoes_tecnicas.map((c, j) => (j === i ? { ...c, texto } : c))
+      return { ...d, vistoria: { ...d.vistoria, conclusoes_tecnicas: lista } }
+    })
+  }
+
+  function moverConstatacao(i: number, delta: number) {
+    const lista = [...constatacoes]
+    const j = i + delta
+    if (j < 0 || j >= lista.length) return
+    ;[lista[i], lista[j]] = [lista[j], lista[i]]
+    gravarConstatacoes(lista)
+  }
+
+  function usarModelo(campo: 'laudo_resumo' | 'conclusao') {
+    const atual = (v[campo] ?? '').trim()
+    if (atual && !window.confirm('Substituir o texto atual pelo texto modelo?')) return
     const local = [v.unidade, v.cidade].filter(Boolean).join(', ') || 'vistoriado'
-    const resumo = obra
-      ? `A obra ${local}, na data de ${v.data_vistoria.split('-').reverse().join('/')}, foi vistoriada e ${problemas.length ? `apresentou ${problemas.length} não conformidade(s) que exigem ação do executor, listadas a seguir:` : 'não apresentou não conformidades nos itens verificados.'}`
-      : `O imóvel ${local} apresenta-se, no geral, em ${problemas.length > 5 ? 'regular' : 'bom'} estado de conservação. ${problemas.length ? 'Todavia, foram identificados vícios e/ou falhas específicas que impactam diretamente o uso diário do imóvel e o bem-estar da família, sendo necessária atenção por parte da construtora na resolução dos seguintes itens:' : 'Não foram identificados vícios ou falhas nos itens verificados.'}`
-    const grau = v.grau_risco ?? (problemas.length ? 'baixo' : 'baixo')
-    const g = GRAU_RISCO[grau]
-    const conclusao = obra
-      ? `Diante das não conformidades verificadas, classificamos a obra, de forma global nesta data, com GRAU DE RISCO ${g.rotulo}, ou seja, ${g.texto}.`
-      : `Diante das inconformidades técnicas construtivas verificadas no imóvel vistoriado, classificamos a edificação de ${v.cliente_nome}, de maneira global, com GRAU DE RISCO ${g.rotulo}, ou seja, ${g.texto}. É necessário, antes do início da utilização da edificação, que sejam sanados todos os apontamentos feitos neste relatório para que não tragam prejuízo ao proprietário.`
-    mudar('laudo_resumo', resumo)
-    mudar('conclusao', conclusao)
-    mudar('grau_risco', grau)
-    salvar('laudo_resumo', resumo)
-    salvar('conclusao', conclusao)
-    salvar('grau_risco', grau)
+    const texto =
+      campo === 'conclusao'
+        ? sugerirConclusao(dados!, sintese, (v.grau_risco ?? sintese.grauSugerido) as Grau)
+        : obra
+          ? `A obra ${local}, na data de ${v.data_vistoria.split('-').reverse().join('/')}, foi vistoriada e ${problemas.length ? `apresentou ${problemas.length} não conformidade(s) que exigem ação do executor, listadas a seguir:` : 'não apresentou não conformidades nos itens verificados.'}`
+          : `O imóvel ${local} apresenta-se, no geral, em ${problemas.length > 5 ? 'regular' : 'bom'} estado de conservação. ${problemas.length ? 'Todavia, foram identificados vícios e/ou falhas específicas que demandam correção, listados a seguir:' : 'Não foram identificados vícios ou falhas nos itens verificados.'}`
+    mudar(campo, texto)
+    salvar(campo, texto)
   }
 
   async function gerar() {
@@ -83,10 +120,13 @@ export default function ConclusaoPage() {
     }
   }
 
-  function texto(campo: keyof Vistoria, rotulo: string, linhas = 4, placeholder = '') {
+  function texto(campo: keyof Vistoria, rotulo: string, linhas = 4, placeholder = '', modelo?: 'laudo_resumo' | 'conclusao') {
     return (
       <label>
-        {rotulo}
+        <span className="titulo-secao">
+          {rotulo}
+          {modelo && <button type="button" className="link" onClick={() => usarModelo(modelo)}>Usar texto modelo</button>}
+        </span>
         <textarea
           rows={linhas}
           placeholder={placeholder}
@@ -126,9 +166,43 @@ export default function ConclusaoPage() {
 
       <section className="cartao">
         <div className="titulo-secao">
-          <h2>Textos do laudo</h2>
-          <button type="button" className="secundario pequeno" onClick={sugerirTextos}>Preencher automático</button>
+          <h2>Constatações técnicas ({constatacoes.length})</h2>
+          {!escolhendo && <button type="button" className="secundario pequeno" onClick={() => setEscolhendo(true)}>+ Biblioteca</button>}
         </div>
+        <p className="sutil pequeno-texto">Escolha na biblioteca (por norma) as constatações que se aplicam a este imóvel. Só o que você marcar sai na conclusão do laudo.</p>
+        {constatacoes.length === 0 && !escolhendo && <p className="sutil">Nenhuma constatação escolhida.</p>}
+        <ol className="lista-simples">
+          {constatacoes.map((c, i) => (
+            <li key={i} className="constatacao">
+              <div className="constatacao-topo">
+                <span className="sutil pequeno-texto">{c.sistema}</span>
+                <span>
+                  <button type="button" className="icone" title="Subir" onClick={() => moverConstatacao(i, -1)}>↑</button>
+                  <button type="button" className="icone" title="Descer" onClick={() => moverConstatacao(i, 1)}>↓</button>
+                  <button type="button" className="icone" title="Remover" onClick={() => gravarConstatacoes(constatacoes.filter((_, j) => j !== i))}>×</button>
+                </span>
+              </div>
+              <textarea rows={3} value={c.texto} onChange={(e) => editarConstatacao(i, e.target.value)} onBlur={() => gravarConstatacoes(dados!.vistoria.conclusoes_tecnicas)} />
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {escolhendo && (
+        <SeletorBiblioteca
+          titulo="Biblioteca de constatações técnicas"
+          tipo="conclusao"
+          grupos={CONCLUSOES}
+          abertos={sistemasComNC}
+          destaque={sistemasComNC}
+          jaUsados={constatacoes.map((c) => c.texto)}
+          onConfirmar={incluirConstatacoes}
+          onFechar={() => setEscolhendo(false)}
+        />
+      )}
+
+      <section className="cartao">
+        <h2>Textos do laudo</h2>
         <label>
           Grau de risco global
           <div className="segmentos">
@@ -138,17 +212,32 @@ export default function ConclusaoPage() {
                 type="button"
                 className={v.grau_risco === valor ? 'ativo' : ''}
                 onClick={() => {
-                  mudar('grau_risco', valor)
-                  salvar('grau_risco', valor)
+                  const novo = v.grau_risco === valor ? null : valor
+                  mudar('grau_risco', novo)
+                  salvar('grau_risco', novo)
                 }}
               >
                 {g.rotulo}
               </button>
             ))}
           </div>
+          <span className="sutil pequeno-texto">
+            {v.grau_risco ? GRAU_RISCO[v.grau_risco].texto : `Você escolhe. Pelo checklist, a sugestão seria ${GRAU_RISCO[sintese.grauSugerido].rotulo}.`}
+          </span>
         </label>
-        {texto('laudo_resumo', 'Laudo (resumo do estado geral)', 5)}
-        {texto('conclusao', 'Conclusão', 5)}
+        {texto('laudo_resumo', 'Laudo (estado geral do imóvel)', 5, 'Escreva ou use o texto modelo', 'laudo_resumo')}
+        {texto('conclusao', 'Parecer final', 5, 'Escreva ou use o texto modelo', 'conclusao')}
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={!!v.incluir_resumo}
+            onChange={(e) => {
+              setDados((d) => (d ? { ...d, vistoria: { ...d.vistoria, incluir_resumo: e.target.checked } } : d))
+              salvarVistoria(v.id, { incluir_resumo: e.target.checked }).catch((err) => setErro(err.message))
+            }}
+          />
+          Incluir quadro-resumo por sistema (contagem de itens, normas e prioridade)
+        </label>
         {texto('pressupostos_extra', 'Pressupostos específicos desta vistoria (opcional)', 3, 'Ex.: instalações elétricas não conferidas por falta de energia; gás sem recipiente.')}
         {obra && (
           <>
@@ -170,7 +259,7 @@ export default function ConclusaoPage() {
         )}
         <label>
           Cidade onde o laudo é assinado
-          <input placeholder="Ex.: Eusébio" value={v.local_emissao ?? ''} onChange={(e) => mudar('local_emissao', e.target.value)} onBlur={() => salvar('local_emissao')} />
+          <input placeholder={profile?.cidade_base || 'Ex.: Eusébio'} value={v.local_emissao ?? ''} onChange={(e) => mudar('local_emissao', e.target.value)} onBlur={() => salvar('local_emissao')} />
         </label>
       </section>
 

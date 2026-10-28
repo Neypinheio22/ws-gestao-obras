@@ -213,3 +213,22 @@ button.icone:hover, button.link:hover, button.link-perigo:hover { background: no
 
 .aviso-amarelo { background: #fef3c7; color: #92400e; padding: 12px; border-radius: 10px; margin: 0; }
 .lista-simples { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+
+/* ---------- perfil ---------- */
+.ok { color: #15803d; margin: 0; font-size: 0.9rem; }
+.previa-assinatura { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px; border: 1px dashed var(--borda, #d1d5db); border-radius: 10px; text-align: center; font-size: 0.9rem; }
+a.aviso-amarelo { text-decoration: none; display: block; }
+
+/* ---------- biblioteca ---------- */
+.seletor { gap: 10px; }
+.grupo-bib { border: 1px solid var(--borda, #e5e7eb); border-radius: 10px; padding: 8px 10px; }
+.grupo-bib summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
+.grupo-bib ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.opcao-bib { display: flex; align-items: flex-start; gap: 6px; }
+.opcao-bib label { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; font-weight: 400; padding: 7px 0; flex: 1; font-size: 0.92rem; line-height: 1.35; }
+.opcao-bib input[type=checkbox], label.check input[type=checkbox] { width: 20px; height: 20px; min-width: 20px; margin: 0; accent-color: var(--primaria); }
+.opcao-bib.usado { opacity: 0.6; }
+label.check { display: flex; flex-direction: row; align-items: center; gap: 10px; font-weight: 400; }
+.novo-bib { border-top: 1px solid var(--borda, #e5e7eb); padding-top: 10px; }
+.constatacao { display: flex; flex-direction: column; gap: 4px; }
+.constatacao-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }

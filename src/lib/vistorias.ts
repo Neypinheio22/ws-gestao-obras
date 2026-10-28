@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { ambientesIniciais, itensParaNovoAmbiente, type TipoVistoria } from './modelos'
+import type { TipoVistoria } from './modelos'
 
 export interface Vistoria {
   id: string
@@ -27,8 +27,17 @@ export interface Vistoria {
   avanco_executado: number | null
   proxima_vistoria: string | null
   local_emissao: string | null
+  objetivo_tipo: string | null
+  objetivo_texto: string | null
+  conclusoes_tecnicas: Constatacao[]
+  incluir_resumo: boolean
   created_at: string
   updated_at: string
+}
+
+export interface Constatacao {
+  sistema: string
+  texto: string
 }
 
 export interface Ambiente {
@@ -44,6 +53,7 @@ export interface Item {
   vistoria_id: string
   ambiente_id: string
   descricao: string
+  sistema: string | null
   ordem: number
   situacao: string | null
   observacao: string | null
@@ -67,37 +77,29 @@ function falhou(error: { message: string } | null) {
   if (error) throw new Error(error.message)
 }
 
+// A vistoria nasce vazia: o vistoriador adiciona os ambientes/etapas e escolhe os itens que vai testar.
 export async function criarVistoria(dados: NovaVistoria): Promise<string> {
   const { data, error } = await supabase.from('vistorias').insert(dados).select('id').single()
   falhou(error)
-  const vistoriaId = (data as { id: string }).id
-
-  const sementes = ambientesIniciais(dados.tipo)
-  for (const [i, s] of sementes.entries()) {
-    await adicionarAmbiente(vistoriaId, s.nome, s.itens, i)
-  }
-  return vistoriaId
+  return (data as { id: string }).id
 }
 
-export async function adicionarAmbiente(vistoriaId: string, nome: string, itens: string[], ordem: number) {
+export async function adicionarAmbiente(vistoriaId: string, nome: string, ordem: number) {
   const { data, error } = await supabase
     .from('ambientes')
     .insert({ vistoria_id: vistoriaId, nome, ordem })
     .select('*')
     .single()
   falhou(error)
-  const amb = data as Ambiente
-  if (itens.length) {
-    const { error: e2 } = await supabase.from('itens').insert(
-      itens.map((descricao, j) => ({ vistoria_id: vistoriaId, ambiente_id: amb.id, descricao, ordem: j })),
-    )
-    falhou(e2)
-  }
-  return amb
+  return data as Ambiente
 }
 
-export function itensSugeridos(tipo: TipoVistoria, tipoAmbiente: string) {
-  return itensParaNovoAmbiente(tipo, tipoAmbiente)
+export async function adicionarItens(amb: Ambiente, novos: { descricao: string; sistema: string | null }[], ordemInicial: number) {
+  if (!novos.length) return
+  const { error } = await supabase.from('itens').insert(
+    novos.map((n, j) => ({ vistoria_id: amb.vistoria_id, ambiente_id: amb.id, descricao: n.descricao, sistema: n.sistema, ordem: ordemInicial + j })),
+  )
+  falhou(error)
 }
 
 export interface VistoriaCompleta {

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import CamposDados from '../components/CamposDados'
 import { ETAPAS_ANDAMENTO, TIPOS_AMBIENTE } from '../lib/modelos'
 import { formatarData, useVistoria } from '../lib/useVistoria'
-import { adicionarAmbiente, apagarVistoria, itensSugeridos, salvarVistoria, type Vistoria } from '../lib/vistorias'
+import { adicionarAmbiente, apagarVistoria, salvarVistoria, type Vistoria } from '../lib/vistorias'
 import { limparCampos } from './NovaVistoria'
 
 export default function VistoriaPage() {
@@ -26,9 +26,9 @@ export default function VistoriaPage() {
     setDados((d) => (d ? { ...d, vistoria: { ...d.vistoria, [campo]: valor } } : d))
   }
 
-  async function salvarCampo(campo: keyof Vistoria) {
+  async function salvarCampo(campo: keyof Vistoria, valor?: string) {
     try {
-      const limpo = limparCampos({ [campo]: dados!.vistoria[campo] } as Partial<Vistoria>)
+      const limpo = limparCampos({ [campo]: valor !== undefined ? valor : dados!.vistoria[campo] } as Partial<Vistoria>)
       if (campo === 'cliente_nome' && !limpo.cliente_nome) return
       await salvarVistoria(v.id, limpo)
     } catch (e) {
@@ -41,11 +41,12 @@ export default function VistoriaPage() {
     if (!nome) return
     setAdicionando(true)
     try {
-      const amb = await adicionarAmbiente(v.id, nome, novoTipo ? itensSugeridos(v.tipo, novoTipo) : [], ambientes.length)
+      const amb = await adicionarAmbiente(v.id, nome, ambientes.length)
       setNovoNome('')
       setNovoTipo('')
       await recarregar()
-      navigate(`/vistoria/${v.id}/ambiente/${amb.id}`)
+      // Abre o ambiente já com a biblioteca para escolher os itens.
+      navigate(`/vistoria/${v.id}/ambiente/${amb.id}?escolher=${encodeURIComponent(novoTipo)}`)
     } catch (e) {
       setErro((e as Error).message)
     } finally {
@@ -85,6 +86,9 @@ export default function VistoriaPage() {
 
       <section className="pilha">
         <h2>{obra ? 'Etapas da obra' : 'Ambientes'}</h2>
+        {ambientes.length === 0 && (
+          <p className="sutil">Adicione {obra ? 'as etapas que vai vistoriar' : 'os ambientes que vai vistoriar'} e escolha os itens de cada um.</p>
+        )}
         <ul className="lista">
           {ambientes.map((a) => {
             const its = itens.filter((i) => i.ambiente_id === a.id)
@@ -110,7 +114,7 @@ export default function VistoriaPage() {
         <div className="cartao">
           <strong>Adicionar {obra ? 'etapa' : 'ambiente'}</strong>
           <select value={novoTipo} onChange={(e) => setNovoTipo(e.target.value)}>
-            <option value="">{obra ? 'Etapa em branco' : 'Escolha o tipo (traz o checklist)'}</option>
+            <option value="">{obra ? 'Etapa (escolha ou escreva o nome)' : 'Tipo de ambiente (escolha ou escreva o nome)'}</option>
             {opcoesTipo.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <input placeholder={obra ? 'Nome (opcional)' : 'Nome (ex.: Suíte 3, Varanda gourmet)'} value={novoNome} onChange={(e) => setNovoNome(e.target.value)} />

@@ -64,17 +64,6 @@ function itensDoTipo(nomeTipo: string) {
   return TIPOS_AMBIENTE.find((t) => t.nome === nomeTipo)?.itens ?? BASE_RECEBIMENTO
 }
 
-const AMBIENTES_PADRAO_RECEBIMENTO: { nome: string; tipo: string }[] = [
-  { nome: 'Sala de estar', tipo: 'Sala' },
-  { nome: 'Cozinha', tipo: 'Cozinha' },
-  { nome: 'Lavabo social', tipo: 'Banheiro / Lavabo' },
-  { nome: 'Suíte 1', tipo: 'Suíte' },
-  { nome: 'Suíte 2', tipo: 'Suíte' },
-  { nome: 'Suíte master', tipo: 'Suíte' },
-  { nome: 'Varanda', tipo: 'Varanda' },
-  { nome: 'Área de serviço', tipo: 'Área de serviço' },
-]
-
 // ---------- Obra em andamento ----------
 
 export const ETAPAS_ANDAMENTO: { nome: string; itens: string[] }[] = [
@@ -123,16 +112,6 @@ export const ETAPAS_ANDAMENTO: { nome: string; itens: string[] }[] = [
     itens: ['Preparo da superfície (massa, lixamento)', 'Uniformidade', 'Manchas e ondulações', 'Louças, metais e acabamentos elétricos'],
   },
 ]
-
-export interface AmbienteSemente {
-  nome: string
-  itens: string[]
-}
-
-export function ambientesIniciais(tipo: TipoVistoria): AmbienteSemente[] {
-  if (tipo === 'andamento') return ETAPAS_ANDAMENTO.map((e) => ({ nome: e.nome, itens: e.itens }))
-  return AMBIENTES_PADRAO_RECEBIMENTO.map((a) => ({ nome: a.nome, itens: itensDoTipo(a.tipo) }))
-}
 
 export function itensParaNovoAmbiente(tipo: TipoVistoria, tipoAmbiente: string): string[] {
   if (tipo === 'andamento') return ETAPAS_ANDAMENTO.find((e) => e.nome === tipoAmbiente)?.itens ?? []
@@ -186,15 +165,92 @@ export const TITULO: Record<TipoVistoria, string> = {
   andamento: 'RELATÓRIO DE VISTORIA TÉCNICA DE OBRA EM ANDAMENTO',
 }
 
-export const OBJETIVO: Record<TipoVistoria, string[]> = {
-  recebimento: [
-    'O presente laudo caracteriza-se pela inspeção predial, tendo como foco central o diagnóstico geral das patologias identificadas no imóvel. São apontadas anomalias construtivas e/ou falhas decorrentes da falta de manutenção, além da análise de riscos oferecidos aos usuários. O resultado consiste na identificação das anomalias e/ou falhas e na proposição de recomendações técnicas que atestem as condições de estabilidade, segurança e conservação adequadas. O documento deve ser utilizado para os fins relacionados ao recebimento de imóvel novo, obedecendo às devidas normas de desempenho, não podendo ser empregado isoladamente para outras finalidades jurídicas, financeiras ou administrativas sem a devida contextualização.',
-    'A utilização parcial, descontextualizada ou sem integridade deste laudo poderá conduzir a interpretações incorretas, não sendo de responsabilidade do profissional signatário quaisquer conclusões decorrentes do uso inadequado do documento. As conclusões e registros constantes neste laudo refletem exclusivamente as condições verificadas durante a inspeção, dentro das limitações técnicas, operacionais e de acesso existentes no momento da vistoria.',
-  ],
-  andamento: [
-    'O presente relatório tem como objetivo registrar, por meio de inspeção visual, o andamento físico da obra e as condições de execução dos serviços vistoriados na data indicada. São verificados a conformidade dos serviços com o projeto e com as normas técnicas aplicáveis, a qualidade de execução, a organização e segurança do canteiro e o avanço em relação ao cronograma.',
-    'O resultado consiste na identificação de não conformidades e falhas executivas, na sua classificação quanto ao grau de risco e na proposição de recomendações técnicas para correção ainda durante a execução, quando o custo de reparo é menor. Este documento reflete exclusivamente as condições verificadas na data da vistoria e não deve ser utilizado isoladamente para outras finalidades jurídicas, financeiras ou administrativas sem a devida contextualização.',
-  ],
+// ---------- Objetivo (finalidade) da vistoria ----------
+
+export interface OpcaoObjetivo {
+  valor: string
+  rotulo: string
+  tipos: TipoVistoria[]
+  // Como o laudo se refere a si mesmo no encerramento: "Este laudo técnico de ..."
+  documento: string
+  texto: string
+}
+
+const USO_DO_LAUDO =
+  'A utilização parcial, descontextualizada ou sem integridade deste laudo poderá conduzir a interpretações incorretas, não sendo de responsabilidade do profissional signatário quaisquer conclusões decorrentes do uso inadequado do documento. As conclusões e registros constantes neste laudo refletem exclusivamente as condições verificadas durante a inspeção, dentro das limitações técnicas, operacionais e de acesso existentes no momento da vistoria.'
+
+export const OBJETIVOS: OpcaoObjetivo[] = [
+  {
+    valor: 'recebimento_novo',
+    rotulo: 'Recebimento de imóvel novo',
+    tipos: ['recebimento'],
+    documento: 'laudo técnico de vistoria de recebimento de imóvel',
+    texto: 'O presente laudo caracteriza-se pela inspeção predial, tendo como foco central o diagnóstico geral das patologias identificadas no imóvel. São apontadas anomalias construtivas e/ou falhas decorrentes da falta de manutenção, além da análise de riscos oferecidos aos usuários. O resultado consiste na identificação das anomalias e/ou falhas e na proposição de recomendações técnicas que atestem as condições de estabilidade, segurança e conservação adequadas. O documento deve ser utilizado para os fins relacionados ao recebimento de imóvel novo, obedecendo às devidas normas de desempenho, não podendo ser empregado isoladamente para outras finalidades jurídicas, financeiras ou administrativas sem a devida contextualização.',
+  },
+  {
+    valor: 'locacao_entrada',
+    rotulo: 'Entrada em imóvel de locação',
+    tipos: ['recebimento'],
+    documento: 'laudo técnico de vistoria de entrada em imóvel locado',
+    texto: 'O presente laudo tem como objetivo registrar, por meio de inspeção visual e relatório fotográfico, o estado de conservação do imóvel, de seus acabamentos, instalações, louças, metais e esquadrias no momento da entrada do locatário. O registro servirá de referência para a comparação na devolução do imóvel, nos termos do art. 22, inciso V, e do art. 23, inciso III, da Lei nº 8.245/1991 (Lei do Inquilinato), permitindo distinguir o desgaste decorrente do uso normal de danos causados durante a locação.',
+  },
+  {
+    valor: 'locacao_devolucao',
+    rotulo: 'Devolução de imóvel de locação',
+    tipos: ['recebimento'],
+    documento: 'laudo técnico de vistoria de devolução de imóvel locado',
+    texto: 'O presente laudo tem como objetivo registrar, por meio de inspeção visual e relatório fotográfico, o estado de conservação do imóvel na sua devolução ao locador, ao término da locação. São identificadas as avarias, faltas e alterações existentes em acabamentos, instalações, louças, metais e esquadrias, distinguindo-se, sempre que possível, o desgaste natural decorrente do uso normal daquilo que configura dano, conforme o art. 23, inciso III, da Lei nº 8.245/1991 (Lei do Inquilinato). Quando houver laudo de entrada, este relatório deve ser interpretado em comparação com ele.',
+  },
+  {
+    valor: 'cautelar_vizinhanca',
+    rotulo: 'Cautelar de vizinhança',
+    tipos: ['recebimento'],
+    documento: 'laudo técnico de vistoria cautelar de vizinhança',
+    texto: 'O presente laudo tem caráter cautelar e objetiva registrar, por meio de inspeção visual e relatório fotográfico, as condições do imóvel vizinho antes do início de obra ou intervenção nas proximidades, com especial atenção a fissuras, trincas, desaprumos, infiltrações e demais manifestações patológicas preexistentes. O registro servirá como referência técnica para a avaliação de eventuais danos que venham a surgir durante ou após a execução dos serviços, em conformidade com a ABNT NBR 16747 e as diretrizes técnicas de vistoria cautelar do IBAPE.',
+  },
+  {
+    valor: 'inspecao_predial',
+    rotulo: 'Inspeção predial / manutenção',
+    tipos: ['recebimento'],
+    documento: 'laudo técnico de inspeção predial',
+    texto: 'O presente laudo caracteriza-se pela inspeção predial, nos termos da ABNT NBR 16747, com foco no diagnóstico do estado de conservação e de manutenção da edificação. São identificadas anomalias construtivas, falhas de manutenção e de uso, classificadas quanto ao grau de risco, e propostas recomendações técnicas e prioridades de intervenção, de modo a subsidiar o plano de manutenção previsto na ABNT NBR 5674.',
+  },
+  {
+    valor: 'pos_reforma',
+    rotulo: 'Recebimento pós-reforma',
+    tipos: ['recebimento', 'andamento'],
+    documento: 'laudo técnico de vistoria de recebimento de reforma',
+    texto: 'O presente laudo tem como objetivo verificar, por meio de inspeção visual, a qualidade de execução dos serviços de reforma concluídos no imóvel, apontando falhas executivas, serviços incompletos e não conformidades com as normas técnicas aplicáveis e com a ABNT NBR 16280 (Reforma em edificações), e propondo as correções necessárias antes do aceite final dos serviços.',
+  },
+  {
+    valor: 'obra_andamento',
+    rotulo: 'Acompanhamento de obra em andamento',
+    tipos: ['andamento'],
+    documento: 'relatório de vistoria técnica de obra em andamento',
+    texto: 'O presente relatório tem como objetivo registrar, por meio de inspeção visual, o andamento físico da obra e as condições de execução dos serviços vistoriados na data indicada. São verificados a conformidade dos serviços com o projeto e com as normas técnicas aplicáveis, a qualidade de execução, a organização e segurança do canteiro e o avanço em relação ao cronograma. O resultado consiste na identificação de não conformidades e falhas executivas, na sua classificação quanto ao grau de risco e na proposição de recomendações técnicas para correção ainda durante a execução, quando o custo de reparo é menor.',
+  },
+  {
+    valor: 'personalizado',
+    rotulo: 'Outro (escrever o objetivo)',
+    tipos: ['recebimento', 'andamento'],
+    documento: 'laudo técnico de vistoria',
+    texto: '',
+  },
+]
+
+export function objetivosDoTipo(tipo: TipoVistoria) {
+  return OBJETIVOS.filter((o) => o.tipos.includes(tipo))
+}
+
+export function objetivoDaVistoria(v: { tipo: TipoVistoria; objetivo_tipo: string | null }) {
+  return OBJETIVOS.find((o) => o.valor === v.objetivo_tipo) ?? objetivosDoTipo(v.tipo)[0]
+}
+
+// Parágrafos do item 1 do laudo: o texto próprio (se houver) ou o do objetivo escolhido, mais o aviso de uso.
+export function paragrafosObjetivo(v: { tipo: TipoVistoria; objetivo_tipo: string | null; objetivo_texto: string | null }) {
+  const proprio = v.objetivo_texto?.trim()
+  const base = proprio ? proprio.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) : [objetivoDaVistoria(v).texto].filter(Boolean)
+  return [...base, USO_DO_LAUDO]
 }
 
 export const METODOLOGIA: Record<TipoVistoria, { titulo: string; texto: string }[]> = {
